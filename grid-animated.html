@@ -1,0 +1,273 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Animated Flower & Fruit Grid</title>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+    <style>
+        body {
+            font-family: Arial;
+            background: #f4f7f4;
+            text-align: center;
+            padding: 25px;
+        }
+
+        h1 { color: #315c45; }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            max-width: 650px;
+            margin: 30px auto;
+        }
+
+        .item {
+            padding: 25px 10px;
+            border-radius: 12px;
+            font-size: 20px;
+            cursor: pointer;
+            transition: transform .2s;
+            user-select: none;
+        }
+
+        .item:hover {
+            transform: scale(1.06);
+        }
+
+        .rose { background: #ffdce5; }
+        .tulip { background: #ffe6b8; }
+        .sunflower { background: #fff3a6; }
+        .hibiscus { background: #f9d6f0; }
+        .apple { background: #ffcaca; }
+        .orange { background: #ffdbb0; }
+        .grapes { background: #e4d5ff; }
+        .strawberry { background: #ffbfc9; }
+
+        /* Single click */
+        .bounce {
+            animation: bounce .5s ease;
+        }
+
+        /* Double click */
+        .shake {
+            animation: shake .45s ease;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-20px); }
+            50% { transform: translateY(0); }
+            70% { transform: translateY(-8px); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+
+        button {
+            padding: 12px 25px;
+            background: #315c45;
+            color: white;
+            border: none;
+            border-radius: 7px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        #results {
+            max-width: 500px;
+            margin: 25px auto;
+            text-align: left;
+            display: none;
+        }
+
+        .result-row {
+            background: white;
+            padding: 13px;
+            margin: 8px 0;
+            border-radius: 7px;
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>🌸 Animated Flower & Fruit Grid 🍎</h1>
+
+<p>Single click = Bounce | Double click = Shake</p>
+
+<div class="grid">
+
+    <div class="item rose" data-id="rose">🌹 Rose</div>
+    <div class="item tulip" data-id="tulip">🌷 Tulip</div>
+    <div class="item sunflower" data-id="sunflower">🌻 Sunflower</div>
+    <div class="item hibiscus" data-id="hibiscus">🌺 Hibiscus</div>
+
+    <div class="item apple" data-id="apple">🍎 Apple</div>
+    <div class="item orange" data-id="orange">🍊 Orange</div>
+    <div class="item grapes" data-id="grapes">🍇 Grapes</div>
+    <div class="item strawberry" data-id="strawberry">🍓 Strawberry</div>
+
+</div>
+
+<button id="showResults">Show Results</button>
+
+<div id="results"></div>
+
+<script>
+
+// AUDIO
+let audioContext;
+
+function playSound(type) {
+
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+
+    if (!AudioCtx) return;
+
+    if (!audioContext) {
+        audioContext = new AudioCtx();
+    }
+
+    if (audioContext.state === "suspended") {
+        audioContext.resume();
+    }
+
+    let oscillator = audioContext.createOscillator();
+    let gain = audioContext.createGain();
+
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+
+    oscillator.type = "sine";
+
+    oscillator.frequency.value =
+        type === "double" ? 700 : 400;
+
+    gain.gain.setValueAtTime(0.15, audioContext.currentTime);
+
+    gain.gain.exponentialRampToValueAtTime(
+        0.001,
+        audioContext.currentTime + 0.15
+    );
+
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.15);
+}
+
+
+// SEND CLICK TO PHP
+function sendClick(id, amount) {
+
+    $.post("grid-animated_response.php", {
+        action: "click",
+        id: id,
+        amount: amount
+
+    }, function(response) {
+
+        console.log(response);
+
+    }, "json");
+}
+
+
+// ANIMATION
+function animateItem(element, animation) {
+
+    element.removeClass("bounce shake");
+
+    // Restart animation
+    void element[0].offsetWidth;
+
+    element.addClass(animation);
+
+}
+
+
+// SINGLE CLICK
+$(".item").on("click", function() {
+
+    let element = $(this);
+    let id = element.data("id");
+
+    clearTimeout(element.data("timer"));
+
+    let timer = setTimeout(function() {
+
+        animateItem(element, "bounce");
+
+        playSound("single");
+
+        sendClick(id, 1);
+
+    }, 250);
+
+    element.data("timer", timer);
+
+});
+
+
+// DOUBLE CLICK
+$(".item").on("dblclick", function() {
+
+    let element = $(this);
+    let id = element.data("id");
+
+    clearTimeout(element.data("timer"));
+
+    animateItem(element, "shake");
+
+    playSound("double");
+
+    sendClick(id, 2);
+
+});
+
+
+// SHOW RESULTS
+$("#showResults").click(function() {
+
+    $.post("grid-animated_response.php", {
+
+        action: "result"
+
+    }, function(data) {
+
+        $("#results").empty();
+
+        $("<h2>")
+            .text("Click Results")
+            .appendTo("#results");
+
+        $.each(data, function(id, count) {
+
+            let row = $("<div>").addClass("result-row");
+
+            $("<span>").text(id).appendTo(row);
+
+            $("<strong>")
+                .text(count + " clicks")
+                .appendTo(row);
+
+            $("#results").append(row);
+
+        });
+
+        $("#results").stop(true, true).fadeIn(500);
+
+    }, "json");
+
+});
+
+</script>
+
+</body>
+</html>
